@@ -4,14 +4,13 @@ const ctx = canvas.getContext("2d");
 // 更新Canvas尺寸
 function updateCanvasSize() {
   canvas.width = window.innerWidth;
-  canvas.height = canvas.width * 0.7;
+  canvas.height = window.innerHeight;
   options.width = canvas.width;
   options.height = canvas.height;
 }
 
 window.addEventListener("resize", updateCanvasSize);
 
-// 图片加载函数 - 保留原有功能
 function loadImages(fileNames, callback) {
   const images = {};
   let loadedCount = 0;
@@ -32,7 +31,7 @@ function loadImages(fileNames, callback) {
   return images;
 }
 
-const GameImages = loadImages(["coin", "swirl", "texture", "stab", "blur", "speedUp", "speedDown", "sameSpeed"], function(images) {
+const GameImages = loadImages(["coin", "swirl", "texture", "stab", "blur", "speedUp", "speedDown", "sameSpeed", "miss"], function(images) {
   console.log("所有图片加载完成");
   init();
 });
@@ -81,7 +80,6 @@ function gameLoop() {
       }
     }
   }
-  app.update();
   render(diff / 1000);
   requestAnimationFrame(gameLoop);
 }
@@ -176,6 +174,32 @@ function render(deltaTime) {
     fillText("Click to restart game.", options.width / 2, options.height * 0.8);
     fillText("~>_<~", options.width / 2, options.height * 0.8 + 25);
   }
+  
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.textBaseline = "middle";
+  ctx.fillRect(options.width - 140, 0, 140, player.expanded ? 200 : 20);
+  ctx.textAlign = "left";
+  ctx.font = "22px sans-serif";
+  fillText(`${format(player.coins)}`, options.width - 90, 30);
+  fillText(`${formatInt(player.failCount)}`, options.width - 90, 80);
+  ctx.drawImage(
+    GameImages.coin,
+    0,
+    0,
+    96,
+    128,
+    options.width - 130,
+    15,
+    21,
+    28
+  );
+  ctx.drawImage(
+    GameImages.miss,
+    options.width - 130,
+    68,
+    21,
+    21
+  );
 }
 
 function fillText(text, x, y) {
@@ -349,6 +373,7 @@ const objectTypes = {
     size: 1.5,
     onMeet() {
       player.failed = true;
+      player.failCount++;
     }
   },
   speed: {
@@ -554,7 +579,9 @@ const player = {
   angle: Math.PI,
   red: true,
   direction: true,
-  failed: false
+  failed: false,
+  failCount: 0,
+  expanded: true
 };
 
 function restart() {
@@ -589,7 +616,7 @@ function getMovingColor() {
 }
 
 function generateRandomObj() {
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 100; i++) {
     for (const key in objectTypes) {
       const x = Math.floor(Math.random() * 100 - 50);
       const y = Math.floor(Math.random() * 100 - 50);
@@ -657,29 +684,6 @@ canvas.addEventListener("click", function() {
     obj.onActive();
   }
   history = [];
-});
-
-const app = new Vue({
-  el: "#app",
-  methods: {
-    format,
-    formatX,
-    formatPercents,
-    formatInt,
-    formatFloat,
-    quantify,
-    quantifyInt,
-    pluralize,
-    formatPow,
-    update() {
-      this.coins.copyFrom(player.coins);
-    }
-  },
-  data() {
-    return {
-      coins: new Decimal(0)
-    }
-  }
 });
 
 Decimal.prototype.valueOf = function() {
