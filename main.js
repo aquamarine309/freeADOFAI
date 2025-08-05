@@ -31,7 +31,11 @@ function loadImages(fileNames, callback) {
   return images;
 }
 
-const GameImages = loadImages(["coin", "swirl", "texture", "stab", "blur", "speedUp", "speedDown", "sameSpeed", "miss"], function(images) {
+const GameImages = loadImages([
+  "coin", "swirl", "texture", "stab",
+  "blur", "speedUp", "speedDown", "sameSpeed",
+  "miss", "recolorTrack", "twoPlanet", "threePlanet"
+], function(images) {
   console.log("所有图片加载完成");
   init();
 });
@@ -43,7 +47,8 @@ const options = {
   width: 0,
   height: 0,
   bpm: 180,
-  notation: new ADNotations.ScientificNotation()
+  notation: new ADNotations.ScientificNotation(),
+  color: `#ac98aa`
 };
 
 
@@ -67,11 +72,8 @@ function gameLoop() {
   player.lastUpdate = now;
   
   if (!player.failed) {
-    player.angle += diff / 1000 * bpmToSpeed(options.bpm) * (player.direction ? 1 : -1);
-    player.angle %= Math.PI * 2;
-    if (player.angle < 0) {
-      player.angle += Math.PI * 2;
-    }
+    player.angle += diff / 1000 * bpmToSpeed(options.bpm) * getDirection();
+    normalizeAngle();
     const next = findNextPos(0.05);
     if (next !== null) {
       const objects = Grid.find(player.targetX + next[0],   player.targetY + next[1]).objects;
@@ -101,32 +103,10 @@ function render(deltaTime) {
   const startY = Math.floor(player.camera.y - options.height / (2 * gridSize));
   const endY = Math.ceil(player.camera.y + options.height / (2 * gridSize));
   
-  // 渲染可见网格
   for (let y = startY; y <= endY; y++) {
     for (let x = startX; x <= endX; x++) {
       const grid = Grid.find(x, y);
-      grid.draw();
-    }
-  }
-  
-  // 渲染游戏对象（硬币）
-  for (const obj of gameMap.objects) {
-    obj.tick(deltaTime);
-    if (isInView(obj.grid.x, obj.grid.y)) {
-      const pos = coordinatesToCanvas(obj.grid.x - player.camera.x, obj.grid.y - player.camera.y);
-      const cutPos = obj.position;
-      const size = options.size * 0.6 * obj.size;
-      ctx.drawImage(
-        obj.image,
-        cutPos.x,
-        cutPos.y,
-        obj.width,
-        obj.height,
-        options.width / 2 + pos.x - size / 2,
-        options.height / 2 + pos.y - size / 2,
-        size,
-        size,
-      );
+      grid.draw(deltaTime);
     }
   }
   
@@ -143,29 +123,51 @@ function render(deltaTime) {
     ctx.stroke();
     ctx.setLineDash([]);
     const angle = player.angle;
-    const historyPos = [
+    const historyPos1 = [
       currentX + options.size * Math.cos(angle),
       currentY + options.size * Math.sin(angle)
     ];
     
-   updateHistory(historyPos);
+    const direction = getDirection();
+    
+    const historyPos2 = [
+      currentX + options.size * Math.cos(angle - Math.PI / 3 * direction),
+      currentY + options.size * Math.sin(angle - Math.PI / 3 * direction)
+    ];
+    
+   updateHistory(historyPos1, historyPos2);
   
     ctx.fillStyle = getCenterColor();
     ctx.beginPath();
     ctx.arc(currentX, currentY, options.size / 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = getMovingColor();
-    for (let i = 0; i < history.length; i++) {
+    ctx.fillStyle = getMovingColor(1);
+    for (let i = 0; i < history[0].length; i++) {
       ctx.globalAlpha = `${1 - i / 10}`;
       ctx.beginPath();
       ctx.arc(
-        history[i][0],
-        history[i][1],
+        history[0][i][0],
+        history[0][i][1],
         options.size / 4 * (1 - i / 10),
         0,
         Math.PI * 2
       );
       ctx.fill();
+    }
+    if (player.threePlanet) {
+      ctx.fillStyle = getMovingColor(2);
+      for (let i = 0; i < history[1].length; i++) {
+        ctx.globalAlpha = `${1 - i / 10}`;
+        ctx.beginPath();
+        ctx.arc(
+          history[1][i][0],
+          history[1][i][1],
+          options.size / 4 * (1 - i / 10),
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = "1";
   } else {
@@ -227,16 +229,22 @@ function updateCamera(deltaTime) {
   player.camera.y += (player.targetY - player.camera.y) * lerpFactor;
 }
 
-let history = [];
+let history = [[], []];
 
-function updateHistory(pos) {
-  history.unshift(pos);
-  if (history.length > 10) {
-    history.pop();
+function updateHistory(pos1, pos2) {
+  const sqrt3 = Math.sqrt(3);
+  history[0].unshift(pos1);
+  history[1].unshift(pos2);
+  if (history[0].length > 10) {
+    history[0].pop();
+    history[1].pop();
   }
 }
 
-// 网格类
+function getDirection() {
+  return player.direction ? 1 : -1;
+}
+
 class Grid {
   static cache = new Map();
   
@@ -260,7 +268,6 @@ class Grid {
     this.y = y;
     this.position = coordinatesToCanvas(this.x, this.y);
     this.key = `${this.x}/${this.y}`;
-    this.color = this.generateColor(x, y);
     Grid.cache.set(this.key, this);
   }
   
@@ -285,18 +292,15 @@ class Grid {
     this.visible = true;
   }
   
-  // 生成固定颜色（根据坐标）
-  generateColor(x, y) {
-    return "#ac98aa";
+  get color() {
+    return options.color;
   }
   
-  draw() {
-    if (!this.visible) return;
-    const gridSize = options.size * 0.8;
+  draw(deltaTime) {
+      const gridSize = options.size * 0.8;
     const screenX = options.width / 2 + (this.x - player.camera.x) * options.size;
     const screenY = options.height / 2 + (this.y - player.camera.y) * options.size;
     
-    // 只绘制在视口内的网格
     if (
       screenX < -gridSize || 
       screenX > options.width + gridSize ||
@@ -306,47 +310,58 @@ class Grid {
       return;
     }
     
-    // 绘制网格
-    ctx.fillStyle = this.color;
-    ctx.fillRect(
-      screenX - gridSize / 2,
-      screenY - gridSize / 2,
-      gridSize,
-      gridSize
-    );
-    
-    ctx.globalAlpha = "0.5";
-    ctx.drawImage(
-      GameImages.texture,
-      this.textureX,
-      this.textureY,
-      128,
-      128,
-      screenX - gridSize / 2,
-      screenY - gridSize / 2,
-      gridSize,
-      gridSize
-    );
-    if (this.reached) {
-    ctx.globalAlpha = "0.8";
-      ctx.drawImage(
-        GameImages.blur,
+    if (this.visible) {
+      ctx.fillStyle = this.color;
+      ctx.fillRect(
         screenX - gridSize / 2,
         screenY - gridSize / 2,
         gridSize,
         gridSize
       );
-    }
-    ctx.globalAlpha = "1";
     
-    // 绘制网格边框
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(
-      screenX - gridSize / 2,
-      screenY - gridSize / 2,
-      gridSize,
-      gridSize
+      ctx.globalAlpha = "0.5";
+      ctx.drawImage(
+        GameImages.texture,
+        this.textureX,
+        this.textureY,
+        128,
+        128,
+        screenX - gridSize / 2,
+        screenY - gridSize / 2,
+        gridSize,
+        gridSize
+      );
+      if (this.reached) {
+      ctx.globalAlpha = "0.8";
+        ctx.drawImage(
+          GameImages.blur,
+          screenX - gridSize / 2,
+          screenY - gridSize / 2,
+          gridSize,
+          gridSize
+        );
+      }
+      ctx.globalAlpha = "1";
+    }
+    
+    if (this.objects.size === 0) return;
+    let showObj = null;
+    for (const obj of this.objects) {
+      obj.tick(deltaTime);
+      showObj = obj;
+    }
+    const cutPos = showObj.position;
+    const size = options.size * 0.6 * showObj.size;
+    ctx.drawImage(
+      showObj.image,
+      cutPos.x,
+      cutPos.y,
+      showObj.width,
+      showObj.height,
+      screenX - size / 2,
+      screenY - size / 2,
+      size,
+      size,
     );
   }
 }
@@ -370,7 +385,7 @@ const objectTypes = {
   },
   stab: {
     hideGrid: true,
-    size: 1.5,
+    size: 1.7,
     onMeet() {
       player.failed = true;
       player.failCount++;
@@ -387,6 +402,20 @@ const objectTypes = {
     },
     onActive(obj, params) {
       options.bpm = params.bpm;
+    }
+  },
+  recolorTrack: {
+    onActive(obj, params) {
+      options.color = params.color;
+    }
+  },
+  multiplanet: {
+    images: () => player.threePlanet ? "twoPlanet" : "threePlanet",
+    onActive() {
+      player.threePlanet = !player.threePlanet;
+      if (!player.threePlanet && player.planet === 2) {
+        player.planet = 0;
+      }
     }
   }
 }
@@ -577,18 +606,19 @@ const player = {
   targetX: 0,
   targetY: 0,
   angle: Math.PI,
-  red: true,
+  planet: 0,
   direction: true,
   failed: false,
   failCount: 0,
-  expanded: true
+  expanded: true,
+  threePlanet: false
 };
 
 function restart() {
   player.targetX = 0;
   player.targetY = 0;
   player.failed = false;
-  player.red = true;
+  player.planet = 0;
   player.direction = true;
   player.angle = Math.PI;
   player.coins = new Decimal(0);
@@ -599,20 +629,23 @@ function restart() {
     grid[1].reached = false;
   }
   gameMap.objects = new Set();
+  options.color = "#ac98aa";
+  player.threePlanet = false;
   generateRandomObj();
 }
 
-const colors = {
-  red: "#ff0000",
-  blue: "#0000ff"
-}
+const colors = ["#ff0000", "#0000ff", "#00ff00"]
 
 function getCenterColor() {
-  return player.red ? colors.red : colors.blue;
+  return colors[player.planet];
 }
 
-function getMovingColor() {
-  return player.red ? colors.blue : colors.red;
+function getMovingColor(idx = 1) {
+  return colors[(player.planet + idx) % planetCount()];
+}
+
+function planetCount() {
+  return player.threePlanet ? 3 : 2;
 }
 
 function generateRandomObj() {
@@ -628,6 +661,12 @@ function generateRandomObj() {
             bpm: Math.floor(Math.random() * 180 + 60)
           }
         };
+      } else if (key === "recolorTrack") {
+        options = {
+          params: {
+            color: randomColor()
+          }
+        }
       }
       gameMap.objects.add(new GameObject(grid, key, options));
     }
@@ -670,21 +709,28 @@ canvas.addEventListener("click", function() {
     restart();
     return;
   }
-  const pi = Math.PI;
   const next = findNextPos();
   player.targetX += next[0];
   player.targetY += next[1];
-  player.angle += pi;
-  player.angle %= pi * 2;
-  player.red = !player.red;
+  player.angle -= Math.PI * getDirection() * 2 / planetCount();
+  normalizeAngle();
+  player.planet = (player.planet + 1) % planetCount();
   const grid = Grid.find(player.targetX, player.targetY);
   grid.reached = true;
   const objects = grid.objects;
   for (const obj of objects) {
     obj.onActive();
   }
-  history = [];
+  history = [[], []];
 });
+
+
+function normalizeAngle() {
+  player.angle %= Math.PI * 2;
+  if (player.angle < 0) {
+    player.angle += Math.PI * 2;
+  }
+}
 
 Decimal.prototype.valueOf = function() {
   throw new Error("Cannot convert a  Decimal to a number");
@@ -693,4 +739,12 @@ Decimal.prototype.valueOf = function() {
 Decimal.prototype.copyFrom = function(decimal) {
   this.mantissa = decimal.mantissa;
   this.exponent = decimal.exponent;
+}
+
+function randomColor() {
+  return "#" + new Array(3).fill(0).map(() => Math.floor(Math.random() * 155 + 100).toString(16)).join("");
+}
+
+Array.prototype.last = function() {
+  return this[this.length - 1];
 }
