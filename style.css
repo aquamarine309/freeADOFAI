@@ -7,36 +7,32 @@
   padding: 0;
 }
 
-/* 2. 根元素字体设置 (支持响应式与无障碍缩放) */
 :root {
-  font-size: 62.5%; /* 1rem = 10px (简化计算) */
+  font-size: 62.5%;
 }
 
 html {
-  scroll-behavior: smooth; /* 启用平滑滚动 */
+  scroll-behavior: smooth;
 }
 
-/* 3. 核心元素默认样式重置 */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: adofai, sans-serif;
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased; /* Mac字体平滑 */
+  -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100vh;
 }
 
-/* 4. 媒体元素自适应 */
 img,
 picture,
 video,
 canvas,
 svg {
-  display: block; /* 消除行内元素下方空隙 */
-  max-width: 100%; /* 防止溢出容器 */
-  height: auto; /* 保持比例 */
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
-/* 5. 表单元素继承字体 (确保统一) */
 input,
 button,
 textarea,
@@ -45,7 +41,6 @@ select {
   color: inherit;
 }
 
-/* 6. 交互元素指针优化 */
 button,
 a,
 select,
@@ -53,30 +48,25 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
-/* 7. 链接默认样式重置 */
 a {
   text-decoration: none;
   color: inherit;
 }
 
-/* 8. 列表样式重置 */
 ul, ol {
   list-style: none;
 }
 
-/* 9. 防止长文本破坏布局 */
 p, h1, h2, h3, h4, h5, h6 {
-  overflow-wrap: break-word; /* 强制换行 */
-  hyphens: auto; /* 自动连字符 (支持多语言) */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
-/* 10. 表格基础重置 */
 table {
   border-collapse: collapse;
   border-spacing: 0;
 }
 
-/* 11. 隐藏视觉但保留屏幕阅读器访问 */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -89,18 +79,21 @@ table {
   border: 0;
 }
 
-/* 12. 移动端点击高亮去除 */
 @media (hover: hover) {
   a:hover {
     text-decoration: underline;
   }
 }
 
-/* 13. 减少动画对敏感用户的影响 */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+@font-face {
+  font-family: adofai;
+  src: url("./adofai.ttf");
 }

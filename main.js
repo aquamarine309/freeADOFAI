@@ -172,7 +172,7 @@ function render(deltaTime) {
     ctx.globalAlpha = "1";
   } else {
     ctx.textAlign = "center";
-    ctx.font = "25px sans-serif";
+    ctx.font = "25px adofai";
     fillText("Click to restart game.", options.width / 2, options.height * 0.8);
     fillText("~>_<~", options.width / 2, options.height * 0.8 + 25);
   }
@@ -181,7 +181,7 @@ function render(deltaTime) {
   ctx.textBaseline = "middle";
   ctx.fillRect(options.width - 140, 0, 140, player.expanded ? 200 : 20);
   ctx.textAlign = "left";
-  ctx.font = "22px sans-serif";
+  ctx.font = "22px adofai";
   fillText(`${format(player.coins)}`, options.width - 90, 30);
   fillText(`${formatInt(player.failCount)}`, options.width - 90, 80);
   ctx.drawImage(
@@ -704,7 +704,7 @@ function findNextPos(range = 0.25) {
   return null;
 }
 
-canvas.addEventListener("click", function() {
+function handleClick() {
   if (player.failed) {
     restart();
     return;
@@ -722,8 +722,9 @@ canvas.addEventListener("click", function() {
     obj.onActive();
   }
   history = [[], []];
-});
+}
 
+canvas.addEventListener("click", handleClick);
 
 function normalizeAngle() {
   player.angle %= Math.PI * 2;
@@ -748,3 +749,5 @@ function randomColor() {
 Array.prototype.last = function() {
   return this[this.length - 1];
 }
+
+window.addEventListener("keydown", handleClick);
