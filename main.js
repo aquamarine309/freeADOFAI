@@ -8,6 +8,8 @@ function updateCanvasSize() {
   options.height = canvas.height;
 }
 
+const bgBPM = 120;
+
 window.addEventListener("resize", updateCanvasSize);
 
 function loadImages(fileNames, callback) {
@@ -30,14 +32,68 @@ function loadImages(fileNames, callback) {
   return images;
 }
 
+function playBGM() {
+  if (!options.bg) {
+    options.bg = GameAudio.bg;
+    options.bg.onended = () => playBGM();
+  }
+  options.bg.pause();
+  updateSpeed();
+  options.bg.currentTime = 0.05;
+  options.bg.play();
+}
+
+function updateSpeed() {
+  options.bg.playbackRate = options.bpm / bgBPM * (player.threePlanet ? 1.5 : 1);
+}
+
+function overangle() {
+  return player.angle % (Math.PI / 4);
+}
+
+function loadAudio(fileNames, callback) {
+  const audio = {};
+  let loadedCount = 0;
+  const totalCount = fileNames.length;
+  
+  for (const name of fileNames) {
+    const path = `./audio/${name}.mp3`;
+    const ado = new Audio();
+    ado.src = path;
+    audio[name] = ado;
+    ado.onloadeddata = function() {
+      loadedCount++;
+      if (loadedCount === totalCount) {
+        callback();
+      }
+    }
+  }
+  return audio;
+}
+
 const GameImages = loadImages([
   "coin", "swirl", "texture", "stab",
   "blur", "speedUp", "speedDown", "sameSpeed",
   "miss", "recolorTrack", "twoPlanet", "threePlanet"
-], function(images) {
+], function() {
+  options.imageLoaded = true;
   console.log("所有图片加载完成");
-  init();
+  tryInit();
 });
+
+const GameAudio = loadAudio([
+  "beat", "bg"
+], function() {
+  options.audioLoaded = true;
+  console.log("所有音频加载完成");
+  tryInit();
+});
+
+function tryInit() {
+  if (!options.initialized && options.imageLoaded && options.audioLoaded) {
+    init();
+  }
+}
 
 const options = {
   get size() {
@@ -45,10 +101,13 @@ const options = {
   },
   width: 0,
   height: 0,
-  bpm: 180,
+  bpm: bgBPM,
   notation: new ADNotations.ScientificNotation(),
   color: `#ac98aa`,
-  initialized: false
+  initialized: false,
+  imageLoaded: false,
+  audioLoaded: false,
+  bg: null
 };
 
 
@@ -378,12 +437,14 @@ const objectTypes = {
     onMeet(obj) {
       obj.remove();
       player.coins = player.coins.add(1);
+      localStorage.setItem("adofai-coin", player.coins.toString());
     }
   },
   stab: {
     hideGrid: true,
     size: 1.7,
     onMeet() {
+      player.angle *= -1;
       player.failed = true;
       player.failCount++;
     }
@@ -398,6 +459,7 @@ const objectTypes = {
       return "sameSpeed";
     },
     onActive(obj, params) {
+      player.angle *= params.bpm / options.bpm;
       options.bpm = params.bpm;
     }
   },
@@ -483,6 +545,7 @@ class GameObject {
     } else if (this.data.onMeet) {
       this.data.onMeet(this, this.options.params);
     }
+    updateSpeed();
   }
   
   onMeet() {
@@ -607,7 +670,8 @@ const player = {
   failed: false,
   failCount: 0,
   expanded: true,
-  threePlanet: false
+  threePlanet: false,
+  clickCount: 0
 };
 
 function restart() {
@@ -617,8 +681,8 @@ function restart() {
   player.planet = 0;
   player.direction = true;
   player.angle = Math.PI;
-  player.coins = new Decimal(0);
-  options.bpm = 180;
+  player.clickCount = 0;
+  options.bpm = bgBPM;
   for (const grid of Grid.cache) {
     grid[1].objects = new Set();
     grid[1].updateVisibility();
@@ -628,6 +692,7 @@ function restart() {
   options.color = "#ac98aa";
   player.threePlanet = false;
   generateRandomObj();
+  playBGM();
 }
 
 const colors = ["#ff0000", "#0000ff", "#00ff00"]
@@ -680,6 +745,11 @@ function init() {
   player.targetX = 0;
   player.targetY = 0;
   
+  const coins = localStorage.getItem("adofai-coin");
+  if (coins) {
+    player.coins = new Decimal(coins);
+  }
+  
   // 启动游戏循环
   requestAnimationFrame(gameLoop);
   options.initialized = true;
@@ -710,8 +780,6 @@ function handleClick() {
   const next = findNextPos();
   player.targetX += next[0];
   player.targetY += next[1];
-  player.angle -= Math.PI * getDirection() * 2 / planetCount();
-  normalizeAngle();
   player.planet = (player.planet + 1) % planetCount();
   const grid = Grid.find(player.targetX, player.targetY);
   grid.reached = true;
@@ -719,6 +787,13 @@ function handleClick() {
   for (const obj of objects) {
     obj.onActive();
   }
+  player.angle -= Math.PI * getDirection() * 2 / planetCount();
+  normalizeAngle();
+  if (player.clickCount++ === 0 && player.failCount === 0) {
+    playBGM();
+    player.angle = Math.PI;
+  }
+  GameAudio.beat.play();
   history = [[], []];
 }
 
