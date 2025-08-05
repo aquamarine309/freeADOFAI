@@ -1,7 +1,6 @@
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-// 更新Canvas尺寸
 function updateCanvasSize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -48,16 +47,15 @@ const options = {
   height: 0,
   bpm: 180,
   notation: new ADNotations.ScientificNotation(),
-  color: `#ac98aa`
+  color: `#ac98aa`,
+  initialized: false
 };
 
 
-// Speed: angle per second
 function bpmToSpeed(bpm) {
   return bpm * Math.PI / 60;
 }
 
-// 坐标转换函数
 function coordinatesToCanvas(x, y) {
   return {
     x: x * options.size,
@@ -65,7 +63,6 @@ function coordinatesToCanvas(x, y) {
   }
 }
 
-// 游戏主循环
 function gameLoop() {
   const now = Date.now();
   const diff = now - player.lastUpdate;
@@ -420,7 +417,6 @@ const objectTypes = {
   }
 }
 
-// 游戏对象类
 class GameObject {
   constructor(grid, type, options = {}) {
     this.grid = grid;
@@ -686,6 +682,7 @@ function init() {
   
   // 启动游戏循环
   requestAnimationFrame(gameLoop);
+  options.initialized = true;
 }
 
 
@@ -705,6 +702,7 @@ function findNextPos(range = 0.25) {
 }
 
 function handleClick() {
+  if (!options.initialized) return;
   if (player.failed) {
     restart();
     return;
